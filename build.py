@@ -130,7 +130,7 @@ def main():
         (ROOT / f"{c['slug']}.html").write_text(build_route_page(c, pts, cum, ascent, route_tpl), encoding="utf-8")
         keep = simplify(pts, SIMPLIFY_SERIES)
         series.append({
-            "tag": c["tag"], "name": c["name"], "color": c["color"], "link": c["link"],
+            "tag": c["tag"], "dates": c.get("dates", ""), "name": c["name"], "color": c["color"], "link": c["link"],
             "km": round(cum[-1], 1), "ascent": ascent,
             "line": [[round(pts[i][1], 5), round(pts[i][0], 5)] for i in keep],
         })
