@@ -1,0 +1,34 @@
+[
+  {
+    "slug": "ber-cph",
+    "tag": "Chase 1",
+    "name": "Berlin → Copenhagen",
+    "gpx": "routes/ber-cph.gpx",
+    "color": "#ff6a2b",
+    "link": "https://nordicchase.com/ber-cph"
+  },
+  {
+    "slug": "cph-osl",
+    "tag": "Chase 2",
+    "name": "Copenhagen → Oslo",
+    "gpx": "routes/cph-osl.gpx",
+    "color": "#2ec4d6",
+    "link": "https://nordicchase.com/cph-osl"
+  },
+  {
+    "slug": "ams-cph",
+    "tag": "Chase 3",
+    "name": "Amsterdam → Copenhagen",
+    "gpx": "routes/ams-cph.gpx",
+    "color": "#ffd23f",
+    "link": "https://nordicchase.com/ams-cph"
+  },
+  {
+    "slug": "cph-sto",
+    "tag": "Chase 4",
+    "name": "Copenhagen → Stockholm",
+    "gpx": "routes/cph-sto.gpx",
+    "color": "#b18cff",
+    "link": "https://nordicchase.com/cph-sto"
+  }
+]

@@ -2,7 +2,32 @@
 
 Interactive route maps embedded on nordicchase.com, hosted with GitHub Pages.
 
-- `series.html`: all four Chases, drawn in order (Chase 1 to 4)
-- `cph-oslo.html`: Copenhagen to Oslo with elevation profile
+| Page | What it shows |
+|---|---|
+| `series.html` | All four Chases on one map, drawn in order, each linking to its page |
+| `ber-cph.html` | Chase 1, Berlin to Copenhagen, with elevation profile |
+| `cph-osl.html` | Chase 2, Copenhagen to Oslo, with elevation profile |
+| `ams-cph.html` | Chase 3, Amsterdam to Copenhagen, with elevation profile |
+| `cph-sto.html` | Chase 4, Copenhagen to Stockholm, with elevation profile |
 
-Live at `https://sandgreg.github.io/maps/<file>.html`.
+Live at `https://sandgreg.github.io/maps/<page>`.
+
+## Update a map
+
+1. Replace a GPX in `routes/` or edit `chases.json` (names, colours, links).
+2. Run `python3 build.py`.
+3. Commit and push to `main`.
+
+## Embed on Squarespace
+
+Add a Code Block and paste:
+
+```html
+<div style="position:relative;width:100%;height:75vh;min-height:520px;max-height:800px;border-radius:12px;overflow:hidden">
+  <iframe src="https://sandgreg.github.io/maps/series.html"
+          style="position:absolute;inset:0;width:100%;height:100%;border:0"
+          loading="lazy" allowfullscreen title="Nordic Chase route map"></iframe>
+</div>
+```
+
+Map data © OpenStreetMap contributors, basemap by OpenFreeMap, rendered with MapLibre GL (BSD-3, see `vendor/`).

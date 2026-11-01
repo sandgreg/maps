@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nordic Chase Route Map</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<style>
+  :root {
+    --route: /*ROUTE_COLOR*/;   /* set per route in chases.json */
+    --bg: #0e1013;
+    --panel: rgba(14, 16, 19, 0.88);
+    --line: rgba(255, 255, 255, 0.08);
+    --text: #eef0f2;
+    --muted: #8b929b;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  #wrap { position: relative; height: 100%; display: flex; flex-direction: column; }
+  #map { flex: 1; min-height: 0; }
+
+  .head { position: absolute; top: 16px; left: 16px; z-index: 2; padding: 14px 18px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); max-width: calc(100% - 80px); }
+  .brand { font-size: 11px; letter-spacing: .22em; font-weight: 700; color: var(--route); text-transform: uppercase; }
+  .title { font-size: 20px; font-weight: 700; margin: 4px 0 10px; letter-spacing: -.01em; }
+  .stats { display: flex; gap: 22px; }
+  .stat b { display: block; font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stat span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+
+  #profile { position: relative; height: 170px; flex: none; background: var(--bg);
+    border-top: 1px solid var(--line); cursor: crosshair; touch-action: none; }
+  #profile canvas { display: block; width: 100%; height: 100%; }
+  #readout { position: absolute; top: 10px; left: 16px; font-size: 13px; color: var(--muted);
+    font-variant-numeric: tabular-nums; pointer-events: none; }
+  #readout b { color: var(--text); font-weight: 600; }
+
+  .pin { width: 14px; height: 14px; border-radius: 50%; border: 3px solid #fff;
+    box-shadow: 0 0 0 4px rgba(0,0,0,.35); }
+  .pin.start { background: #2ecc71; }
+  .pin.finish { background: #fff; border-color: #111; outline: 2px solid #fff; }
+  .km { font-size: 10px; font-weight: 700; color: #111; background: #fff; border-radius: 9px;
+    padding: 2px 6px; font-variant-numeric: tabular-nums; box-shadow: 0 1px 4px rgba(0,0,0,.5); }
+  .cursor { width: 14px; height: 14px; border-radius: 50%; background: var(--route);
+    border: 3px solid #fff; box-shadow: 0 0 12px var(--route); }
+  .maplibregl-ctrl-attrib { font-size: 10px; }
+
+  @media (max-width: 600px) {
+    .head { top: 10px; left: 10px; padding: 10px 12px; }
+    .title { font-size: 16px; margin-bottom: 8px; }
+    .stats { gap: 14px; }
+    .stat b { font-size: 14px; }
+    #profile { height: 130px; }
+  }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div class="head">
+    <div class="brand">Nordic Chase</div>
+    <div class="title" id="title"></div>
+    <div class="stats">
+      <div class="stat"><b id="sDist"></b><span>Distance</span></div>
+      <div class="stat"><b id="sAsc"></b><span>Elevation</span></div>
+      <div class="stat"><b id="sMax"></b><span>Highest</span></div>
+    </div>
+  </div>
+  <div id="map"></div>
+  <div id="profile"><canvas id="cv"></canvas><div id="readout"></div></div>
+</div>
+
+<script>
+const ROUTE = /*ROUTE_DATA*/;
+const ASCENT_OVERRIDE = null;   // put Strava's exact figure here (e.g. 5214) to show that instead of the calculated one
+if (ASCENT_OVERRIDE) ROUTE.ascent = ASCENT_OVERRIDE;
+
+const fmt = n => n.toLocaleString('en-US');
+document.getElementById('title').textContent = ROUTE.name;
+document.getElementById('sDist').textContent = fmt(Math.round(ROUTE.km)) + ' km';
+document.getElementById('sAsc').textContent = fmt(ROUTE.ascent) + ' m';
+document.getElementById('sMax').textContent = fmt(ROUTE.max) + ' m';
+
+const P = ROUTE.profile.map(p => ({ d: p[0], e: Math.max(0, p[1]), lat: p[2], lon: p[3] }));
+const coords = ROUTE.line.map(p => [p[0], p[1]]);
+
+// ---------- Map ----------
+const bounds = coords.reduce((b, c) => b.extend(c), new maplibregl.LngLatBounds(coords[0], coords[0]));
+const map = new maplibregl.Map({
+  container: 'map',
+  style: 'https://tiles.openfreemap.org/styles/dark',
+  bounds, fitBoundsOptions: { padding: { top: 140, bottom: 40, left: 40, right: 40 } },
+  attributionControl: { compact: true },
+  cooperativeGestures: window.self !== window.top   // when embedded: ctrl/2-finger to zoom, so the page still scrolls
+});
+map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+map.addControl(new maplibregl.FullscreenControl(), 'top-right');
+
+map.on('load', () => {
+  // hide country/state borders drawn across sea and lakes (maritime boundaries)
+  map.getStyle().layers.filter(l => l['source-layer'] === 'boundary').forEach(l => {
+    const f = map.getFilter(l.id);
+    map.setFilter(l.id, f ? ['all', f, ['!=', ['get', 'maritime'], 1]] : ['!=', ['get', 'maritime'], 1]);
+  });
+  map.addSource('route', { type: 'geojson', lineMetrics: true, data: { type: 'Feature', geometry: { type: 'LineString', coordinates: coords } } });
+  map.addLayer({ id: 'route-glow', type: 'line', source: 'route',
+    layout: { 'line-join': 'round', 'line-cap': 'round' },
+    paint: { 'line-gradient': lineGrad(0), 'line-width': 10, 'line-opacity': 0.25, 'line-blur': 6 } });
+  map.addLayer({ id: 'route-line', type: 'line', source: 'route',
+    layout: { 'line-join': 'round', 'line-cap': 'round' },
+    paint: { 'line-gradient': lineGrad(0), 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 2.5, 12, 5] } });
+  // wide invisible layer to make hovering the line easy
+  map.addLayer({ id: 'route-hit', type: 'line', source: 'route', paint: { 'line-color': '#000', 'line-opacity': 0, 'line-width': 24 } });
+
+  startAnimation();
+  map.on('mousemove', 'route-hit', e => { map.getCanvas().style.cursor = 'pointer'; setCursor(nearestIdx(e.lngLat), false); });
+  map.on('mouseleave', 'route-hit', () => { map.getCanvas().style.cursor = ''; clearCursor(); });
+});
+
+function getCss(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+function el(cls, txt) { const d = document.createElement('div'); d.className = cls; if (txt) d.textContent = txt; return d; }
+
+new maplibregl.Marker({ element: el('pin start') }).setLngLat(coords[0]).addTo(map);
+const finishMarker = new maplibregl.Marker({ element: el('pin finish') }).setLngLat(coords[coords.length - 1]);
+
+// km markers every 100 km
+const kmMarkers = [];
+for (let k = 100; k < ROUTE.km - 20; k += 100) {
+  const p = P[Math.round(k / (P[1].d - P[0].d))] || P[P.length - 1];
+  kmMarkers.push({ km: k, m: new maplibregl.Marker({ element: el('km', k + ' km'), anchor: 'left', offset: [10, 0] }).setLngLat([p.lon, p.lat]) });
+}
+
+const cursorMarker = new maplibregl.Marker({ element: el('cursor') });
+
+// ---------- Elevation profile ----------
+const cv = document.getElementById('cv'), ctx = cv.getContext('2d'), readout = document.getElementById('readout');
+const box = document.getElementById('profile');
+const PAD = { l: 44, r: 16, t: 34, b: 22 };
+const eMax = Math.max(50, Math.ceil(ROUTE.max / 50) * 50), dMax = P[P.length - 1].d;
+let W = 0, H = 0, hover = -1;
+
+const xOf = d => PAD.l + (d / dMax) * (W - PAD.l - PAD.r);
+const yOf = e => H - PAD.b - (e / eMax) * (H - PAD.t - PAD.b);
+
+function draw() {
+  const dpr = window.devicePixelRatio || 1;
+  W = box.clientWidth; H = box.clientHeight;
+  cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  const route = getCss('--route'), muted = getCss('--muted');
+
+  // grid
+  ctx.font = '11px system-ui, sans-serif'; ctx.fillStyle = muted; ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1;
+  ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  for (let e = 0; e <= eMax; e += eMax / 2) {
+    const y = Math.round(yOf(e)) + .5; ctx.beginPath(); ctx.moveTo(PAD.l, y); ctx.lineTo(W - PAD.r, y); ctx.stroke();
+    ctx.fillText(e + ' m', PAD.l - 6, y);
+  }
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  const step = W < 500 ? 200 : 100;
+  for (let d = 0; d <= dMax; d += step) ctx.fillText(d + ' km', xOf(d), H - PAD.b + 6);
+
+  // area
+  const grad = ctx.createLinearGradient(0, PAD.t, 0, H - PAD.b);
+  grad.addColorStop(0, hexA(route, .45)); grad.addColorStop(1, hexA(route, .02));
+  ctx.beginPath(); ctx.moveTo(xOf(0), yOf(0));
+  ctx.save(); ctx.beginPath(); ctx.rect(0, 0, xOf(prog * dMax), H); ctx.clip();   // profile fills in with the route animation
+  ctx.beginPath(); ctx.moveTo(xOf(0), yOf(0));
+  P.forEach(p => ctx.lineTo(xOf(p.d), yOf(p.e)));
+  ctx.lineTo(xOf(dMax), yOf(0)); ctx.closePath(); ctx.fillStyle = grad; ctx.fill();
+  ctx.beginPath(); P.forEach((p, i) => i ? ctx.lineTo(xOf(p.d), yOf(p.e)) : ctx.moveTo(xOf(p.d), yOf(p.e)));
+  ctx.strokeStyle = route; ctx.lineWidth = 1.5; ctx.stroke(); ctx.restore();
+
+  // hover
+  if (hover >= 0) {
+    const p = P[hover], x = xOf(p.d), y = yOf(p.e);
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(Math.round(x) + .5, PAD.t - 6); ctx.lineTo(Math.round(x) + .5, H - PAD.b); ctx.stroke();
+    ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI * 2); ctx.fillStyle = '#fff'; ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = route; ctx.stroke();
+    readout.innerHTML = `<b>${p.d.toFixed(1)} km</b> · ${p.e} m · ${Math.round(dMax - p.d)} km to go`;
+  } else {
+    readout.textContent = 'Hover or tap the profile to explore · click to zoom the map';
+  }
+}
+function hexA(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; }
+
+function idxFromEvent(ev) {
+  const r = box.getBoundingClientRect(), x = (ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left;
+  const d = Math.min(dMax, Math.max(0, (x - PAD.l) / (W - PAD.l - PAD.r) * dMax));
+  return Math.round(d / dMax * (P.length - 1));
+}
+function setCursor(i, fromProfile) {
+  hover = i; const p = P[i];
+  cursorMarker.setLngLat([p.lon, p.lat]).addTo(map);
+  if (fromProfile && !map.getBounds().contains([p.lon, p.lat])) map.panTo([p.lon, p.lat], { duration: 300 });
+  draw();
+}
+function clearCursor() { hover = -1; cursorMarker.remove(); draw(); }
+function nearestIdx(ll) {
+  let best = 0, bd = Infinity; const k = Math.cos(ll.lat * Math.PI / 180);
+  for (let i = 0; i < P.length; i++) { const dx = (P[i].lon - ll.lng) * k, dy = P[i].lat - ll.lat, d = dx * dx + dy * dy; if (d < bd) { bd = d; best = i; } }
+  return best;
+}
+
+box.addEventListener('mousemove', e => setCursor(idxFromEvent(e), true));
+box.addEventListener('mouseleave', clearCursor);
+box.addEventListener('touchstart', e => setCursor(idxFromEvent(e), true), { passive: true });
+box.addEventListener('touchmove', e => setCursor(idxFromEvent(e), true), { passive: true });
+box.addEventListener('click', e => { const p = P[idxFromEvent(e)]; map.flyTo({ center: [p.lon, p.lat], zoom: 12, duration: 1200 }); });
+window.addEventListener('resize', draw);
+// ---------- Draw-on animation ----------
+const ANIM_MS = 4500;   // how long the route takes to draw, in milliseconds
+let prog = 0;
+const head = new maplibregl.Marker({ element: el('cursor') });
+
+function lineGrad(p) {
+  const c = getCss('--route'), t = 'rgba(0,0,0,0)';
+  if (p >= 1) return ['step', ['line-progress'], c, 2, c];
+  return ['step', ['line-progress'], c, Math.max(p, 1e-6), t];
+}
+function pointAt(km) {   // position on the route at a given distance
+  let lo = 0, hi = ROUTE.line.length - 1;
+  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (ROUTE.line[m][2] < km) lo = m; else hi = m; }
+  const a = ROUTE.line[lo], b = ROUTE.line[hi], f = b[2] > a[2] ? (km - a[2]) / (b[2] - a[2]) : 0;
+  return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f];
+}
+function setProgress(p) {
+  prog = p;
+  const g = lineGrad(p);
+  map.setPaintProperty('route-line', 'line-gradient', g);
+  map.setPaintProperty('route-glow', 'line-gradient', g);
+  const km = p * ROUTE.km;
+  kmMarkers.forEach(k => { if (km >= k.km && !k.on) { k.m.addTo(map); k.on = true; } });
+  if (p < 1) head.setLngLat(pointAt(km)).addTo(map); else { head.remove(); finishMarker.addTo(map); }
+  draw();
+}
+function startAnimation() {
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { setProgress(1); return; }
+  const t0 = performance.now(), ease = x => x < .5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
+  (function frame(now) {
+    const x = Math.min(1, (now - t0) / ANIM_MS);
+    setProgress(ease(x));
+    if (x < 1) requestAnimationFrame(frame);
+  })(t0);
+}
+
+draw();
+</script>
+</body>
+</html>
