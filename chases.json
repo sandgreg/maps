@@ -5,6 +5,7 @@
     "dates": "3-8 June 2027",
     "name": "Berlin → Copenhagen",
     "gpx": "routes/ber-cph.gpx",
+    "gravel_km": 740,
     "color": "#ff6a2b",
     "link": "https://nordicchase.com/ber-cph"
   },
@@ -14,6 +15,7 @@
     "dates": "17-23 June 2027",
     "name": "Copenhagen → Oslo",
     "gpx": "routes/cph-osl.gpx",
+    "gravel_km": 794,
     "color": "#2ec4d6",
     "link": "https://nordicchase.com/cph-osl"
   },
@@ -23,6 +25,7 @@
     "dates": "5-10 August 2027",
     "name": "Amsterdam → Copenhagen",
     "gpx": "routes/ams-cph.gpx",
+    "gravel_km": null,
     "color": "#ffd23f",
     "link": "https://nordicchase.com/ams-cph"
   },
@@ -32,6 +35,7 @@
     "dates": "20-25 August 2027",
     "name": "Copenhagen → Stockholm",
     "gpx": "routes/cph-sto.gpx",
+    "gravel_km": 781,
     "color": "#b18cff",
     "link": "https://nordicchase.com/cph-sto"
   }

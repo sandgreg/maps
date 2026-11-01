@@ -131,7 +131,7 @@ def main():
         keep = simplify(pts, SIMPLIFY_SERIES)
         series.append({
             "tag": c["tag"], "dates": c.get("dates", ""), "name": c["name"], "color": c["color"], "link": c["link"],
-            "km": round(cum[-1], 1), "ascent": ascent,
+            "km": round(cum[-1], 1), "gravel_km": c.get("gravel_km"),
             "line": [[round(pts[i][1], 5), round(pts[i][0], 5)] for i in keep],
         })
         print(f"{c['tag']:8} {c['name']:26} {cum[-1]:6.1f} km  {ascent:5d} m  -> {c['slug']}.html")
