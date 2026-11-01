@@ -88,10 +88,13 @@ return maplibregl$1;
     backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
   .brand { font-size: 11px; letter-spacing: .22em; font-weight: 700; color: var(--accent); text-transform: uppercase; }
   .title { font-size: 20px; font-weight: 700; margin: 4px 0 12px; letter-spacing: -.01em; }
-  .row { display: grid; grid-template-columns: 4px 1fr; gap: 12px; padding: 9px 8px; margin: 0 -8px;
+  .row { display: grid; grid-template-columns: 4px 1fr auto; align-items: center; color: inherit; text-decoration: none; gap: 12px; padding: 9px 8px; margin: 0 -8px;
     border-radius: 8px; cursor: pointer; opacity: .35; transition: opacity .4s, background .2s; }
   .row.on { opacity: 1; }
   .row:hover { background: rgba(255,255,255,0.05); }
+  .go { font-size: 16px; color: var(--muted); transition: transform .2s, color .2s; }
+  .row:hover .go { color: var(--text); transform: translateX(3px); }
+  .bar { align-self: stretch; }
   .bar { border-radius: 2px; }
   .tag { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; font-weight: 600; }
   .name { font-size: 15px; font-weight: 600; margin: 1px 0 2px; }
@@ -110,6 +113,7 @@ return maplibregl$1;
     .title { display: none; }
     .rows { display: grid; grid-template-columns: 1fr 1fr; column-gap: 8px; margin-top: 6px; }
     .row { padding: 6px 8px; gap: 8px; }
+    .go { display: none; }
     .name { font-size: 13px; }
     .meta { font-size: 11px; }
     .replay { margin-top: 4px; }
@@ -130,6 +134,14 @@ const CHASES = [{"tag":"Chase 1","name":"Berlin \u2192 Copenhagen","km":726.4,"a
 const COLORS = ['#ff6a2b', '#2ec4d6', '#ffd23f', '#b18cff'];   // Chase 1-4 colours: change freely
 const ANIM_MS = 2600;   // time to draw each route, in milliseconds
 const PAUSE_MS = 300;   // pause between routes
+const LINKS = [         // page each Chase links to (Chase 1-4)
+  'https://nordicchase.com/ber-cph',
+  'https://nordicchase.com/cph-osl',
+  'https://nordicchase.com/ams-cph',
+  'https://nordicchase.com/cph-sto'
+];
+// open the Chase page in the main window, also when the map is embedded in an iframe
+const openChase = i => window.open(LINKS[i], '_top');
 
 const fmt = n => n.toLocaleString('en-US');
 const el = (cls, css) => { const d = document.createElement('div'); d.className = cls; if (css) Object.assign(d.style, css); return d; };
@@ -147,14 +159,13 @@ CHASES.forEach((c, i) => {
     const a = c.line[j - 1], b = c.line[j], my = lat => Math.log(Math.tan(Math.PI / 4 + lat * Math.PI / 360)) * 180 / Math.PI;
     c.cum.push(c.cum[j - 1] + Math.hypot(b[0] - a[0], my(b[1]) - my(a[1])));
   }
-  const r = document.createElement('div');
-  r.className = 'row';
+  const r = document.createElement('a');
+  r.className = 'row'; r.href = LINKS[i]; r.target = '_top';
   r.innerHTML = `<div class="bar" style="background:${c.color}"></div>
     <div><div class="tag">${c.tag}</div><div class="name">${c.name}</div>
-    <div class="meta">${fmt(Math.round(c.km))} km · ${fmt(c.ascent)} m</div></div>`;
+    <div class="meta">${fmt(Math.round(c.km))} km · ${fmt(c.ascent)} m</div></div><div class="go">→</div>`;
   r.addEventListener('mouseenter', () => highlight(i));
   r.addEventListener('mouseleave', () => highlight(-1));
-  r.addEventListener('click', () => map.fitBounds(boundsOf(c.line), { padding: pad(), duration: 1200 }));
   rowsEl.appendChild(r); c.row = r;
 });
 
@@ -197,7 +208,7 @@ map.on('load', () => {
     map.addLayer({ id: 'hit' + i, type: 'line', source: 'r' + i, paint: { 'line-color': '#000', 'line-opacity': 0, 'line-width': 20 } });
     map.on('mouseenter', 'hit' + i, () => { map.getCanvas().style.cursor = 'pointer'; highlight(i); });
     map.on('mouseleave', 'hit' + i, () => { map.getCanvas().style.cursor = ''; highlight(-1); });
-    map.on('click', 'hit' + i, () => map.fitBounds(boundsOf(c.line), { padding: pad(), duration: 1200 }));
+    map.on('click', 'hit' + i, () => openChase(i));
 
     // end markers in the route colour (Copenhagen gets one shared hub marker)
     c.markers = [];
