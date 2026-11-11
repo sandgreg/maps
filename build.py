@@ -3,9 +3,12 @@
 
 Usage:  python3 build.py
 
-Reads chases.json and the GPX files in routes/, then writes:
-  series.html          all Chases on one map, drawn in order
-  <slug>.html          one page per Chase with an elevation profile
+Reads chases.json and the GPX files in routes/ (<slug>-road.gpx and, where a
+Chase has one, <slug>-gravel.gpx), then writes:
+  series.html          all Chases on one map, drawn in order (road editions)
+  <slug>.html          one page per Chase with an elevation profile; holds the
+                       road edition and, if there is one, the gravel edition
+                       (?edition=gravel shows it; road is the default)
 
 (cph-oslo.html is a hand-written redirect to cph-osl.html, kept so older embeds keep working.)
 
@@ -99,7 +102,8 @@ def to_json(data):
     return json.dumps(data, separators=(",", ":"), ensure_ascii=False)
 
 
-def build_route_page(chase, pts, cum, ascent, template):
+def route_data(chase, pts, cum, ascent):
+    """Map data for one edition (road or gravel) of a Chase."""
     keep = simplify(pts, SIMPLIFY_SINGLE)
     profile, t, i, n = [], 0.0, 0, len(pts)
     while t <= cum[-1]:
@@ -108,13 +112,17 @@ def build_route_page(chase, pts, cum, ascent, template):
         profile.append([round(t, 2), round(pts[i][2]), round(pts[i][0], 5), round(pts[i][1], 5)])
         t += PROFILE_STEP_KM
     profile.append([round(cum[-1], 2), round(pts[-1][2]), round(pts[-1][0], 5), round(pts[-1][1], 5)])
-    data = {
+    return {
         "name": chase["name"], "km": round(cum[-1], 1), "ascent": ascent,
         "max": round(max(p[2] for p in pts)),
         "line": [[round(pts[i][1], 5), round(pts[i][0], 5), round(cum[i], 2)] for i in keep],
         "profile": profile,
     }
-    html = template.replace("/*ROUTE_DATA*/", to_json(data)).replace("/*ROUTE_COLOR*/", ROUTE_PAGE_COLOR)
+
+
+def build_route_page(editions, template):
+    """editions = {"road": data, "gravel": data or None}; road is the default edition."""
+    html = template.replace("/*ROUTE_EDITIONS*/", to_json(editions)).replace("/*ROUTE_COLOR*/", ROUTE_PAGE_COLOR)
     return inline_maplibre(html)
 
 
@@ -124,17 +132,25 @@ def main():
     series_tpl = (ROOT / "src/series-template.html").read_text(encoding="utf-8")
     series = []
     for c in chases:
-        pts = load_gpx(ROOT / c["gpx"])
+        pts = load_gpx(ROOT / c["road_gpx"])
         cum = cumulative_km(pts)
         ascent = total_ascent(pts)
-        (ROOT / f"{c['slug']}.html").write_text(build_route_page(c, pts, cum, ascent, route_tpl), encoding="utf-8")
-        keep = simplify(pts, SIMPLIFY_SERIES)
+        editions = {"road": route_data(c, pts, cum, ascent), "gravel": None}
+        if c.get("gravel_gpx"):
+            gpts = load_gpx(ROOT / c["gravel_gpx"])
+            gcum = cumulative_km(gpts)
+            editions["gravel"] = route_data(c, gpts, gcum, total_ascent(gpts))
+        (ROOT / f"{c['slug']}.html").write_text(build_route_page(editions, route_tpl), encoding="utf-8")
+        keep = simplify(pts, SIMPLIFY_SERIES)  # series map shows the road edition
         series.append({
             "tag": c["tag"], "dates": c.get("dates", ""), "name": c["name"], "color": c["color"], "link": c["link"],
             "km": round(cum[-1], 1), "gravel_km": c.get("gravel_km"),
             "line": [[round(pts[i][1], 5), round(pts[i][0], 5)] for i in keep],
         })
         print(f"{c['tag']:8} {c['name']:26} {cum[-1]:6.1f} km  {ascent:5d} m  -> {c['slug']}.html")
+        if editions["gravel"]:
+            g = editions["gravel"]
+            print(f"{'':8} {'  + gravel edition':26} {g['km']:6.1f} km  {g['ascent']:5d} m")
     html = inline_maplibre(series_tpl.replace("/*SERIES_DATA*/", to_json(series)))
     (ROOT / "series.html").write_text(html, encoding="utf-8")
     print("series map -> series.html")
