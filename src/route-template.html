@@ -47,12 +47,23 @@
     border: 3px solid #fff; box-shadow: 0 0 12px var(--route); }
   .maplibregl-ctrl-attrib { font-size: 10px; }
 
+  /* landmark pins, sent by the parent page in story mode */
+  .lm { display: flex; align-items: center; gap: 6px; pointer-events: none; }
+  .lm i { width: 10px; height: 10px; border-radius: 50%; background: #fff; border: 2px solid var(--route); flex: none; }
+  .lm span { font-size: 11px; font-weight: 700; color: #111; background: #fff; border-radius: 9px;
+    padding: 2px 7px; white-space: nowrap; box-shadow: 0 1px 4px rgba(0,0,0,.5); }
+
+  /* ?mode=story: the parent page shows the stats, so the panel goes */
+  body.story .head { display: none; }
+
   @media (max-width: 600px) {
     .head { top: 10px; left: 10px; padding: 10px 12px; }
     .title { font-size: 16px; margin-bottom: 8px; }
     .stats { gap: 14px; }
     .stat b { font-size: 14px; }
     #profile { height: 130px; }
+    body.story #profile { height: 96px; }
+    .lm span { font-size: 10px; padding: 1px 6px; }
   }
 </style>
 </head>
@@ -72,38 +83,64 @@
 </div>
 
 <script>
-const ROUTE = /*ROUTE_DATA*/;
-const ASCENT_OVERRIDE = null;   // put Strava's exact figure here (e.g. 5214) to show that instead of the calculated one
-if (ASCENT_OVERRIDE) ROUTE.ascent = ASCENT_OVERRIDE;
+const EDITIONS = /*ROUTE_EDITIONS*/;   // { road: {...}, gravel: {...} | null }
+const ASCENT_OVERRIDE = { road: null, gravel: null };   // put Strava's exact figure here (e.g. 5214) to show that instead of the calculated one
+['road', 'gravel'].forEach(ed => { if (EDITIONS[ed] && ASCENT_OVERRIDE[ed]) EDITIONS[ed].ascent = ASCENT_OVERRIDE[ed]; });
+
+// URL options (all optional; with none the page behaves as it always has):
+//   ?edition=gravel   show the gravel edition (road is the default)
+//   ?mode=story       for the scroll story on a race page: no stats panel, no automatic draw-on,
+//                     the parent page drives the map with postMessage (see "Embed API" below)
+const QS = new URLSearchParams(location.search);
+const STORY = QS.get('mode') === 'story';
+let edition = QS.get('edition') === 'gravel' && EDITIONS.gravel ? 'gravel' : 'road';
+let ROUTE = EDITIONS[edition];
+if (STORY) document.body.classList.add('story');
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const fmt = n => n.toLocaleString('en-US');
-document.getElementById('title').textContent = ROUTE.name;
-document.getElementById('sDist').textContent = fmt(Math.round(ROUTE.km)) + ' km';
-document.getElementById('sAsc').textContent = fmt(ROUTE.ascent) + ' m';
-document.getElementById('sMax').textContent = fmt(ROUTE.max) + ' m';
+function fillStats() {
+  document.getElementById('title').textContent = ROUTE.name;
+  document.getElementById('sDist').textContent = fmt(Math.round(ROUTE.km)) + ' km';
+  document.getElementById('sAsc').textContent = fmt(ROUTE.ascent) + ' m';
+  document.getElementById('sMax').textContent = fmt(ROUTE.max) + ' m';
+}
+fillStats();
 
-const P = ROUTE.profile.map(p => ({ d: p[0], e: Math.max(0, p[1]), lat: p[2], lon: p[3] }));
-const coords = ROUTE.line.map(p => [p[0], p[1]]);
+let P, coords;
+function loadData() {
+  P = ROUTE.profile.map(p => ({ d: p[0], e: Math.max(0, p[1]), lat: p[2], lon: p[3] }));
+  coords = ROUTE.line.map(p => [p[0], p[1]]);
+}
+loadData();
+const boundsOf = cs => cs.reduce((b, c) => b.extend(c), new maplibregl.LngLatBounds(cs[0], cs[0]));
 
 // ---------- Map ----------
-const bounds = coords.reduce((b, c) => b.extend(c), new maplibregl.LngLatBounds(coords[0], coords[0]));
+const PAD = STORY ? { top: 40, bottom: 30, left: 30, right: 30 } : { top: 140, bottom: 40, left: 40, right: 40 };
 const map = new maplibregl.Map({
   container: 'map',
   style: 'https://tiles.openfreemap.org/styles/dark',
-  bounds, fitBoundsOptions: { padding: { top: 140, bottom: 40, left: 40, right: 40 } },
+  bounds: boundsOf(coords), fitBoundsOptions: { padding: PAD },
   attributionControl: { compact: true },
   cooperativeGestures: window.self !== window.top   // when embedded: ctrl/2-finger to zoom, so the page still scrolls
 });
 map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
 map.addControl(new maplibregl.FullscreenControl(), 'top-right');
 
+let mapReady = false;
+const routeGeo = () => ({ type: 'Feature', geometry: { type: 'LineString', coordinates: coords } });
 map.on('load', () => {
   // hide country/state borders drawn across sea and lakes (maritime boundaries)
   map.getStyle().layers.filter(l => l['source-layer'] === 'boundary').forEach(l => {
     const f = map.getFilter(l.id);
     map.setFilter(l.id, f ? ['all', f, ['!=', ['get', 'maritime'], 1]] : ['!=', ['get', 'maritime'], 1]);
   });
-  map.addSource('route', { type: 'geojson', lineMetrics: true, data: { type: 'Feature', geometry: { type: 'LineString', coordinates: coords } } });
+  map.addSource('route', { type: 'geojson', lineMetrics: true, data: routeGeo() });
+  if (STORY) {   // the whole route, faint, so readers see where the story is going
+    map.addLayer({ id: 'route-ghost', type: 'line', source: 'route',
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: { 'line-color': getCss('--route'), 'line-opacity': 0.3, 'line-width': ['interpolate', ['linear'], ['zoom'], 5, 2, 12, 4] } });
+  }
   map.addLayer({ id: 'route-glow', type: 'line', source: 'route',
     layout: { 'line-join': 'round', 'line-cap': 'round' },
     paint: { 'line-gradient': lineGrad(0), 'line-width': 10, 'line-opacity': 0.25, 'line-blur': 6 } });
@@ -113,35 +150,45 @@ map.on('load', () => {
   // wide invisible layer to make hovering the line easy
   map.addLayer({ id: 'route-hit', type: 'line', source: 'route', paint: { 'line-color': '#000', 'line-opacity': 0, 'line-width': 24 } });
 
-  startAnimation();
+  mapReady = true;
+  if (STORY) { setProgress(0); flushQueue(); } else startAnimation();
   map.on('mousemove', 'route-hit', e => { map.getCanvas().style.cursor = 'pointer'; setCursor(nearestIdx(e.lngLat), false); });
   map.on('mouseleave', 'route-hit', () => { map.getCanvas().style.cursor = ''; clearCursor(); });
+  if (window.parent !== window) window.parent.postMessage({ type: 'nc:ready', edition, editions: Object.keys(EDITIONS).filter(k => EDITIONS[k]) }, '*');
 });
 
 function getCss(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
 function el(cls, txt) { const d = document.createElement('div'); d.className = cls; if (txt) d.textContent = txt; return d; }
 
-new maplibregl.Marker({ element: el('pin start') }).setLngLat(coords[0]).addTo(map);
+const startMarker = new maplibregl.Marker({ element: el('pin start') }).setLngLat(coords[0]).addTo(map);
 const finishMarker = new maplibregl.Marker({ element: el('pin finish') }).setLngLat(coords[coords.length - 1]);
 
-// km markers every 100 km
-const kmMarkers = [];
-for (let k = 100; k < ROUTE.km - 20; k += 100) {
-  const p = P[Math.round(k / (P[1].d - P[0].d))] || P[P.length - 1];
-  kmMarkers.push({ km: k, m: new maplibregl.Marker({ element: el('km', k + ' km'), anchor: 'left', offset: [10, 0] }).setLngLat([p.lon, p.lat]) });
+// km markers every 100 km (not in story mode: the landmark pins do that job there)
+let kmMarkers = [];
+function makeKmMarkers() {
+  kmMarkers.forEach(k => k.m.remove());
+  kmMarkers = [];
+  if (STORY) return;
+  for (let k = 100; k < ROUTE.km - 20; k += 100) {
+    const p = P[Math.round(k / (P[1].d - P[0].d))] || P[P.length - 1];
+    kmMarkers.push({ km: k, m: new maplibregl.Marker({ element: el('km', k + ' km'), anchor: 'left', offset: [10, 0] }).setLngLat([p.lon, p.lat]) });
+  }
 }
+makeKmMarkers();
 
 const cursorMarker = new maplibregl.Marker({ element: el('cursor') });
 
 // ---------- Elevation profile ----------
 const cv = document.getElementById('cv'), ctx = cv.getContext('2d'), readout = document.getElementById('readout');
 const box = document.getElementById('profile');
-const PAD = { l: 44, r: 16, t: 34, b: 22 };
-const eMax = Math.max(50, Math.ceil(ROUTE.max / 50) * 50), dMax = P[P.length - 1].d;
+const PADP = { l: 44, r: 16, t: 34, b: 22 };
+let eMax, dMax;
+function scaleProfile() { eMax = Math.max(50, Math.ceil(ROUTE.max / 50) * 50); dMax = P[P.length - 1].d; }
+scaleProfile();
 let W = 0, H = 0, hover = -1;
 
-const xOf = d => PAD.l + (d / dMax) * (W - PAD.l - PAD.r);
-const yOf = e => H - PAD.b - (e / eMax) * (H - PAD.t - PAD.b);
+const xOf = d => PADP.l + (d / dMax) * (W - PADP.l - PADP.r);
+const yOf = e => H - PADP.b - (e / eMax) * (H - PADP.t - PADP.b);
 
 function draw() {
   const dpr = window.devicePixelRatio || 1;
@@ -154,17 +201,22 @@ function draw() {
   ctx.font = '11px system-ui, sans-serif'; ctx.fillStyle = muted; ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1;
   ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
   for (let e = 0; e <= eMax; e += eMax / 2) {
-    const y = Math.round(yOf(e)) + .5; ctx.beginPath(); ctx.moveTo(PAD.l, y); ctx.lineTo(W - PAD.r, y); ctx.stroke();
-    ctx.fillText(e + ' m', PAD.l - 6, y);
+    const y = Math.round(yOf(e)) + .5; ctx.beginPath(); ctx.moveTo(PADP.l, y); ctx.lineTo(W - PADP.r, y); ctx.stroke();
+    ctx.fillText(e + ' m', PADP.l - 6, y);
   }
   ctx.textAlign = 'center'; ctx.textBaseline = 'top';
   const step = W < 500 ? 200 : 100;
-  for (let d = 0; d <= dMax; d += step) ctx.fillText(d + ' km', xOf(d), H - PAD.b + 6);
+  for (let d = 0; d <= dMax; d += step) ctx.fillText(d + ' km', xOf(d), H - PADP.b + 6);
+
+  // story mode: the whole profile faintly, so the reader sees what is coming
+  if (STORY) {
+    ctx.beginPath(); P.forEach((p, i) => i ? ctx.lineTo(xOf(p.d), yOf(p.e)) : ctx.moveTo(xOf(p.d), yOf(p.e)));
+    ctx.strokeStyle = hexA(route, .3); ctx.lineWidth = 1; ctx.stroke();
+  }
 
   // area
-  const grad = ctx.createLinearGradient(0, PAD.t, 0, H - PAD.b);
+  const grad = ctx.createLinearGradient(0, PADP.t, 0, H - PADP.b);
   grad.addColorStop(0, hexA(route, .45)); grad.addColorStop(1, hexA(route, .02));
-  ctx.beginPath(); ctx.moveTo(xOf(0), yOf(0));
   ctx.save(); ctx.beginPath(); ctx.rect(0, 0, xOf(prog * dMax), H); ctx.clip();   // profile fills in with the route animation
   ctx.beginPath(); ctx.moveTo(xOf(0), yOf(0));
   P.forEach(p => ctx.lineTo(xOf(p.d), yOf(p.e)));
@@ -176,19 +228,19 @@ function draw() {
   if (hover >= 0) {
     const p = P[hover], x = xOf(p.d), y = yOf(p.e);
     ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(Math.round(x) + .5, PAD.t - 6); ctx.lineTo(Math.round(x) + .5, H - PAD.b); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(Math.round(x) + .5, PADP.t - 6); ctx.lineTo(Math.round(x) + .5, H - PADP.b); ctx.stroke();
     ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI * 2); ctx.fillStyle = '#fff'; ctx.fill();
     ctx.lineWidth = 2; ctx.strokeStyle = route; ctx.stroke();
     readout.innerHTML = `<b>${p.d.toFixed(1)} km</b> · ${p.e} m · ${Math.round(dMax - p.d)} km to go`;
   } else {
-    readout.textContent = 'Hover or tap the profile to explore · click to zoom the map';
+    readout.textContent = STORY ? '' : 'Hover or tap the profile to explore · click to zoom the map';
   }
 }
 function hexA(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; }
 
 function idxFromEvent(ev) {
   const r = box.getBoundingClientRect(), x = (ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left;
-  const d = Math.min(dMax, Math.max(0, (x - PAD.l) / (W - PAD.l - PAD.r) * dMax));
+  const d = Math.min(dMax, Math.max(0, (x - PADP.l) / (W - PADP.l - PADP.r) * dMax));
   return Math.round(d / dMax * (P.length - 1));
 }
 function setCursor(i, fromProfile) {
@@ -233,11 +285,13 @@ function setProgress(p) {
   map.setPaintProperty('route-glow', 'line-gradient', g);
   const km = p * ROUTE.km;
   kmMarkers.forEach(k => { if (km >= k.km && !k.on) { k.m.addTo(map); k.on = true; } });
-  if (p < 1) head.setLngLat(pointAt(km)).addTo(map); else { head.remove(); finishMarker.addTo(map); }
+  if (p <= 0 && STORY) head.remove();
+  else if (p < 1) head.setLngLat(pointAt(km)).addTo(map);
+  else { head.remove(); finishMarker.addTo(map); }
   draw();
 }
 function startAnimation() {
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { setProgress(1); return; }
+  if (reduceMotion) { setProgress(1); return; }
   const t0 = performance.now(), ease = x => x < .5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
   (function frame(now) {
     const x = Math.min(1, (now - t0) / ANIM_MS);
@@ -245,6 +299,72 @@ function startAnimation() {
     if (x < 1) requestAnimationFrame(frame);
   })(t0);
 }
+
+// ---------- Embed API (used by the race pages' scroll story) ----------
+// The parent page sends:
+//   { type: 'nc:goto', km, toKm }          draw the route up to toKm (or km) and fit the map to km..toKm
+//   { type: 'nc:edition', edition }        'road' or 'gravel'
+//   { type: 'nc:landmarks', items: [{ name, km }] }   labelled pins, placed on the route at each km
+// The page answers { type: 'nc:ready' } once the map has loaded.
+const ALLOWED_ORIGIN = [
+  /^https:\/\/(www\.)?nordicchase\.com$/,
+  /^https:\/\/[a-z0-9-]+\.squarespace\.com$/,
+  /^https:\/\/sandgreg\.github\.io$/,
+  /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/
+];
+let storyGoto = null, storyLandmarks = [], lmMarkers = [], animId = 0, queue = [];
+
+function placeLandmarks() {
+  lmMarkers.forEach(m => m.remove());
+  lmMarkers = storyLandmarks.filter(l => typeof l.km === 'number' && l.km >= 0 && l.km <= ROUTE.km + 1).map(l => {
+    const d = el('lm'); const i = document.createElement('i'); const s = document.createElement('span');
+    s.textContent = l.name; d.append(i, s);
+    return new maplibregl.Marker({ element: d, anchor: 'left', offset: [-5, 0] }).setLngLat(pointAt(l.km)).addTo(map);
+  });
+}
+function gotoKm(km, toKm) {
+  const from = Math.max(0, Math.min(km, ROUTE.km));
+  const to = Math.max(from, Math.min(typeof toKm === 'number' ? toKm : from, ROUTE.km));
+  storyGoto = { km: from, toKm: to };
+  // fit the map to this chapter's stretch of route
+  const seg = ROUTE.line.filter(p => p[2] >= from && p[2] <= Math.max(to, from + 20)).map(p => [p[0], p[1]]);
+  if (seg.length > 1) map.fitBounds(boundsOf(seg), { padding: PAD, duration: reduceMotion ? 0 : 1100, maxZoom: 11 });
+  // grow (or shrink) the drawn line to the end of the chapter
+  const target = to / ROUTE.km, start = prog, id = ++animId;
+  if (reduceMotion) { setProgress(target); return; }
+  const t0 = performance.now(), ms = 900;
+  (function frame(now) {
+    if (id !== animId) return;
+    const x = Math.min(1, (now - t0) / ms), e = 1 - Math.pow(1 - x, 3);
+    setProgress(start + (target - start) * e);
+    if (x < 1) requestAnimationFrame(frame);
+  })(t0);
+}
+function setEdition(next) {
+  if (next === edition || !EDITIONS[next]) return;
+  edition = next; ROUTE = EDITIONS[edition];
+  loadData(); scaleProfile(); fillStats(); makeKmMarkers();
+  startMarker.setLngLat(coords[0]); finishMarker.setLngLat(coords[coords.length - 1]); finishMarker.remove();
+  map.getSource('route').setData(routeGeo());
+  animId++; prog = 0;
+  placeLandmarks();
+  if (storyGoto) gotoKm(storyGoto.km, storyGoto.toKm);
+  else if (STORY) { setProgress(0); map.fitBounds(boundsOf(coords), { padding: PAD, duration: reduceMotion ? 0 : 800 }); }
+  else { map.fitBounds(boundsOf(coords), { padding: PAD, duration: reduceMotion ? 0 : 800 }); startAnimation(); }
+}
+function handle(msg) {
+  if (msg.type === 'nc:edition') setEdition(msg.edition === 'gravel' ? 'gravel' : 'road');
+  else if (msg.type === 'nc:landmarks') { storyLandmarks = Array.isArray(msg.items) ? msg.items.slice(0, 40) : []; placeLandmarks(); }
+  else if (msg.type === 'nc:goto' && typeof msg.km === 'number') gotoKm(msg.km, msg.toKm);
+}
+function flushQueue() { const q = queue; queue = []; q.forEach(handle); }
+window.addEventListener('message', e => {
+  if (!ALLOWED_ORIGIN.some(r => r.test(e.origin))) return;
+  const msg = e.data;
+  if (!msg || typeof msg.type !== 'string' || msg.type.indexOf('nc:') !== 0) return;
+  if (!mapReady) { queue.push(msg); return; }
+  handle(msg);
+});
 
 draw();
 </script>
