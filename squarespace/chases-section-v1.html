@@ -1,0 +1,159 @@
+<!-- Nordic Chase: "The Chases" section (series map + four Chase cards)
+     Version 1.0, uses series.html (legend shown on phones).
+     Paste into one Squarespace Code Block. Facts to check each season are marked EDIT. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+
+<style>
+  .ncx { font-family: 'Schibsted Grotesk', system-ui, sans-serif; color: #2E3104; }
+  .ncx *, .ncx *::before, .ncx *::after { box-sizing: border-box; }
+
+  /* Heading */
+  .ncx-eyebrow { margin: 0 0 10px; font-size: 15px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: #5c6020; }
+  .ncx-title { margin: 0 0 28px; font-size: clamp(34px, 4vw, 56px); font-weight: 900; line-height: 1.02; color: #2E3104; }
+
+  /* Series map */
+  .ncx-map { position: relative; width: 100%; border-radius: 12px; overflow: hidden; background: #2E3104;
+             height: 70vh; min-height: 480px; max-height: 720px; margin-bottom: 28px; }
+  .ncx-map iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+
+  /* Cards */
+  .ncx-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; }
+  .ncx-card { background: #ffffff; border: 1px solid #e3e5c4; border-radius: 16px; overflow: hidden;
+              display: flex; flex-direction: column; }
+  .ncx-strip { height: 10px; background: var(--chase); }
+  .ncx-body { padding: 22px; display: flex; flex-direction: column; gap: 12px; flex-grow: 1; }
+  .ncx-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .ncx-no { font-size: 14px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+  .ncx-status { font-size: 13px; font-weight: 600; background: #2E3104; color: #D6FF3F; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+  .ncx-route { margin: 0; font-size: 24px; font-weight: 800; line-height: 1.12; color: #2E3104; }
+  .ncx-hook { margin: 0; font-size: 16px; line-height: 1.45; color: #4a4d1c; }
+  .ncx-facts { margin: 4px 0 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 15px; }
+  .ncx-facts dt { color: #5c6020; }
+  .ncx-facts dd { margin: 0; font-weight: 600; }
+  .ncx-spacer { flex-grow: 1; }
+  .ncx-btn { margin-top: 8px; display: flex; align-items: center; justify-content: center; min-height: 48px;
+             border: 2px solid #2E3104; border-radius: 999px; font-weight: 700; font-size: 16px;
+             color: #2E3104 !important; text-decoration: none !important; background: transparent; transition: background .15s, color .15s; }
+  .ncx-btn:hover, .ncx-btn:focus-visible { background: #2E3104; color: #FEFFE9 !important; }
+  .ncx-hint { display: none; margin: 0 0 12px; font-size: 14px; color: #5c6020; }
+
+  /* Tablet: two columns */
+  @media (max-width: 1100px) {
+    .ncx-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  /* Phone: shorter map, cards become a swipe row */
+  @media (max-width: 767px) {
+    .ncx-title { margin-bottom: 20px; }
+    .ncx-map { height: 60vh; min-height: 380px; max-height: 520px; margin-bottom: 20px; }
+    .ncx-hint { display: block; }
+    .ncx-cards { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory;
+                 -webkit-overflow-scrolling: touch; padding-bottom: 8px; margin-right: -20px; padding-right: 20px; }
+    .ncx-card { flex: 0 0 82%; scroll-snap-align: start; }
+    .ncx-body { padding: 18px; gap: 10px; }
+    .ncx-route { font-size: 22px; }
+    .ncx-hook { font-size: 15px; }
+    .ncx-facts { font-size: 14px; }
+  }
+</style>
+
+<section class="ncx" aria-labelledby="ncx-title">
+  <p class="ncx-eyebrow">The Chases</p>
+  <h2 class="ncx-title" id="ncx-title">Four races. Pick yours.</h2>
+
+  <div class="ncx-map">
+    <iframe src="https://sandgreg.github.io/maps/series.html"
+            loading="lazy" allowfullscreen title="Nordic Chase route map"></iframe>
+  </div>
+
+  <p class="ncx-hint">Swipe the cards to see all four →</p>
+
+  <div class="ncx-cards">
+
+    <!-- Chase 1 -->
+    <article class="ncx-card" style="--chase:#ff6a2b">
+      <div class="ncx-strip" aria-hidden="true"></div>
+      <div class="ncx-body">
+        <div class="ncx-top">
+          <span class="ncx-no">Chase 1</span>
+          <span class="ncx-status">Entries open</span><!-- EDIT status -->
+        </div>
+        <h3 class="ncx-route">Berlin → Copenhagen</h3>
+        <p class="ncx-hook">Two capitals, with beautiful nature in between.</p>
+        <dl class="ncx-facts">
+          <dt>Dates</dt><dd>3–8 June 2027</dd>
+          <dt>Distance</dt><dd>Road 726 km · Gravel 740 km</dd>
+          <dt>Places</dt><dd>100 road · 100 gravel</dd>
+          <dt>Entry</dt><dd>395 EUR</dd><!-- EDIT price -->
+        </dl>
+        <div class="ncx-spacer"></div>
+        <a class="ncx-btn" href="/ber-cph">View Chase</a>
+      </div>
+    </article>
+
+    <!-- Chase 2 -->
+    <article class="ncx-card" style="--chase:#2ec4d6">
+      <div class="ncx-strip" aria-hidden="true"></div>
+      <div class="ncx-body">
+        <div class="ncx-top">
+          <span class="ncx-no">Chase 2</span>
+          <span class="ncx-status">Entries open</span><!-- EDIT status -->
+        </div>
+        <h3 class="ncx-route">Copenhagen → Oslo</h3>
+        <p class="ncx-hook">Two capitals, three countries, two completely different rides.</p>
+        <dl class="ncx-facts">
+          <dt>Dates</dt><dd>17–23 June 2027</dd>
+          <dt>Distance</dt><dd>Road 728 km · Gravel 794 km</dd>
+          <dt>Places</dt><dd>100 road · 100 gravel</dd>
+          <dt>Entry</dt><dd>395 EUR</dd><!-- EDIT price -->
+        </dl>
+        <div class="ncx-spacer"></div>
+        <a class="ncx-btn" href="/cph-osl">View Chase</a>
+      </div>
+    </article>
+
+    <!-- Chase 3 -->
+    <article class="ncx-card" style="--chase:#ffd23f">
+      <div class="ncx-strip" aria-hidden="true"></div>
+      <div class="ncx-body">
+        <div class="ncx-top">
+          <span class="ncx-no">Chase 3</span>
+          <span class="ncx-status">Entries open</span><!-- EDIT status -->
+        </div>
+        <h3 class="ncx-route">Amsterdam → Copenhagen</h3>
+        <p class="ncx-hook">The longest chase. Three countries, two great rivers, four ferries.</p>
+        <dl class="ncx-facts">
+          <dt>Dates</dt><dd>5–10 August 2027</dd>
+          <dt>Distance</dt><dd>Road 910 km (road only)</dd>
+          <dt>Places</dt><dd>100 road</dd>
+          <dt>Entry</dt><dd>395 EUR</dd><!-- EDIT price -->
+        </dl>
+        <div class="ncx-spacer"></div>
+        <a class="ncx-btn" href="/ams-cph">View Chase</a>
+      </div>
+    </article>
+
+    <!-- Chase 4 -->
+    <article class="ncx-card" style="--chase:#b18cff">
+      <div class="ncx-strip" aria-hidden="true"></div>
+      <div class="ncx-body">
+        <div class="ncx-top">
+          <span class="ncx-no">Chase 4</span>
+          <span class="ncx-status">Entries open</span><!-- EDIT status -->
+        </div>
+        <h3 class="ncx-route">Copenhagen → Stockholm</h3>
+        <p class="ncx-hook">Capital to capital, straight across southern Sweden.</p>
+        <dl class="ncx-facts">
+          <dt>Dates</dt><dd>20–25 August 2027</dd>
+          <dt>Distance</dt><dd>Road 784 km · Gravel 781 km</dd>
+          <dt>Places</dt><dd>100 road · 100 gravel</dd>
+          <dt>Entry</dt><dd>395 EUR</dd><!-- EDIT price -->
+        </dl>
+        <div class="ncx-spacer"></div>
+        <a class="ncx-btn" href="/cph-sto">View Chase</a>
+      </div>
+    </article>
+
+  </div>
+</section>

@@ -32,3 +32,9 @@ To add a Chase: drop the GPX in `routes/`, add an entry to `chases.json`, build.
 - Clicking a Chase (legend row or route line) opens its page with `target="_top"`, so it leaves the iframe.
 - `cooperativeGestures` is on when embedded, so visitors scroll the Squarespace page instead of zooming the map.
 - The Copenhagen hub marker position is the `CPH` constant in `src/series-template.html`.
+
+## Versions
+
+- Tags `vMAJOR.MINOR` on `main`, listed in `CHANGELOG.md`. Add an entry for every change that reaches `main`.
+- `squarespace/` holds the homepage Code Blocks, one file per version (`chases-section-vN.html`). Each file's header says which map page and which repo version it needs.
+- Existing page names are never changed or removed, so old embeds keep working. New variants get a new file name.
