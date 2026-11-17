@@ -5,6 +5,7 @@ Usage:  python3 build.py
 
 Reads chases.json and the GPX files in routes/, then writes:
   series.html          all Chases on one map, drawn in order
+  series-embed.html    same map, legend hidden on phones (for pages that list the Chases themselves)
   <slug>.html          one page per Chase with an elevation profile
 
 (cph-oslo.html is a hand-written redirect to cph-osl.html, kept so older embeds keep working.)
@@ -135,9 +136,14 @@ def main():
             "line": [[round(pts[i][1], 5), round(pts[i][0], 5)] for i in keep],
         })
         print(f"{c['tag']:8} {c['name']:26} {cum[-1]:6.1f} km  {ascent:5d} m  -> {c['slug']}.html")
-    html = inline_maplibre(series_tpl.replace("/*SERIES_DATA*/", to_json(series)))
+    data = to_json(series)
+    html = inline_maplibre(series_tpl.replace("/*SERIES_DATA*/", data).replace("/*BODY_CLASS*/", ""))
     (ROOT / "series.html").write_text(html, encoding="utf-8")
     print("series map -> series.html")
+    # embed variant: same map, no legend on phones, route fills the frame (for pages that list the Chases themselves)
+    html = inline_maplibre(series_tpl.replace("/*SERIES_DATA*/", data).replace("/*BODY_CLASS*/", "clean").replace("/*CLEAN*/false", "true"))
+    (ROOT / "series-embed.html").write_text(html, encoding="utf-8")
+    print("series embed -> series-embed.html")
 
 
 if __name__ == "__main__":

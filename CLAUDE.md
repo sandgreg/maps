@@ -8,10 +8,10 @@ Interactive route maps for nordicchase.com (Squarespace 7.1). Hosted with GitHub
 - `chases.json`: one entry per Chase (slug, tag, name, GPX path, series colour, link to its page on nordicchase.com). Order = draw order on the series map.
 - `routes/*.gpx`: route GPX files exported from Strava (they carry Strava's elevation data).
 - `src/route-template.html`: single-Chase page (route, km markers, interactive elevation profile, draw-on animation).
-- `src/series-template.html`: all Chases on one map, drawn one after another, legend links to each Chase page.
+- `src/series-template.html`: all Chases on one map, drawn one after another, legend links to each Chase page. `build.py` writes it twice: `series.html` (legend always shown) and `series-embed.html` (`CLEAN = true`: legend hidden on phones, route fills the frame, refits if the iframe is resized before the visitor touches the map).
 - `build.py`: turns the GPX files into map data and writes the pages. Pure Python 3, no dependencies.
 - `vendor/`: MapLibre GL 4.7.1, inlined into every page by the build.
-- Built output (committed, served by Pages): `series.html`, `<slug>.html`. `cph-oslo.html` is a hand-written redirect to `cph-osl.html` for older links.
+- Built output (committed, served by Pages): `series.html`, `series-embed.html`, `<slug>.html`. `cph-oslo.html` is a hand-written redirect to `cph-osl.html` for older links.
 
 ## Workflow
 
@@ -32,3 +32,9 @@ To add a Chase: drop the GPX in `routes/`, add an entry to `chases.json`, build.
 - Clicking a Chase (legend row or route line) opens its page with `target="_top"`, so it leaves the iframe.
 - `cooperativeGestures` is on when embedded, so visitors scroll the Squarespace page instead of zooming the map.
 - The Copenhagen hub marker position is the `CPH` constant in `src/series-template.html`.
+
+## Versions
+
+- Tags `vMAJOR.MINOR` on `main`, listed in `CHANGELOG.md`. Add an entry for every change that reaches `main`.
+- `squarespace/` holds the homepage Code Blocks, one file per version (`chases-section-vN.html`). Each file's header says which map page and which repo version it needs.
+- Existing page names are never changed or removed, so old embeds keep working. New variants get a new file name.
