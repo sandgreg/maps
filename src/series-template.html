@@ -59,10 +59,11 @@
     .tag .dates { display: block; }
     .meta { font-size: 11px; }
     .replay { margin-top: 4px; }
+    .clean .legend { display: none; }   /* embed variant: the page around the map already lists the Chases */
   }
 </style>
 </head>
-<body>
+<body class="/*BODY_CLASS*/">
 <div id="map"></div>
 <div class="legend">
   <div class="brand">Nordic Chase</div>
@@ -73,6 +74,7 @@
 
 <script>
 const CHASES = /*SERIES_DATA*/;
+const CLEAN = /*CLEAN*/false;   // true in series-embed.html: no legend on phones, route fills the frame
 // colours, names and links come from chases.json
 const ANIM_MS = 2600;   // time to draw each route, in milliseconds
 const PAUSE_MS = 300;   // pause between routes
@@ -106,6 +108,7 @@ CHASES.forEach((c, i) => {
 
 function boundsOf(line) { return line.reduce((b, p) => b.extend(p), new maplibregl.LngLatBounds(line[0], line[0])); }
 function pad() {
+  if (CLEAN && window.innerWidth <= 600) return { top: 24, bottom: 24, left: 20, right: 60 };   // right: room for the zoom buttons
   return window.innerWidth <= 600 ? { top: 30, bottom: 190, left: 20, right: 20 }
                                    : { top: 50, bottom: 50, left: 340, right: 60 };
 }
@@ -119,6 +122,12 @@ const map = new maplibregl.Map({
   attributionControl: { compact: true },
   cooperativeGestures: window.self !== window.top
 });
+if (CLEAN) {
+  // the iframe can be sized after the map starts (lazy loading, Squarespace layout), so fit again whenever the frame resizes
+  let touched = false;
+  map.on('mousedown', () => touched = true); map.on('touchstart', () => touched = true); map.on('wheel', () => touched = true);
+  map.on('resize', () => { if (!touched) map.fitBounds(allBounds, { padding: pad(), duration: 0 }); });
+}
 map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
 map.addControl(new maplibregl.FullscreenControl(), 'top-right');
 

@@ -5,6 +5,7 @@ Interactive route maps embedded on nordicchase.com, hosted with GitHub Pages.
 | Page | What it shows |
 |---|---|
 | `series.html` | All four Chases on one map, drawn in order, each linking to its page |
+| `series-embed.html` | Same map without the legend on phones, for pages that already list the Chases (the homepage Chases section) |
 | `ber-cph.html` | Chase 1, Berlin to Copenhagen, with elevation profile |
 | `cph-osl.html` | Chase 2, Copenhagen to Oslo, with elevation profile |
 | `ams-cph.html` | Chase 3, Amsterdam to Copenhagen, with elevation profile |
